@@ -50,10 +50,10 @@ loss or duplication. See `xenomit-orchestrator/docs/03-graceful-handoff.md`.
 
 ## Layout contract
 
-`xenomit-bot` keeps only `view.rs` (GPUI), `live_map.rs` (GPUI),
+`xenomit-bot-gui` keeps only `view.rs` (GPUI), `live_map.rs` (GPUI),
 `module_settings.rs` (GPUI), and `mod.rs` (window bootstrap). Everything
-planner-adjacent lives here; the GUI consumes this crate through a sibling
-path dependency.
+planner-adjacent lives here; the GUI consumes this crate as a git
+dependency.
 
 ## Test
 
