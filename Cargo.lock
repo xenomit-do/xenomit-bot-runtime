@@ -2122,7 +2122,7 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 [[package]]
 name = "xenomit-behavior-engine"
 version = "0.1.0"
-source = "git+https://github.com/xenomit-do/xenomit-behavior-engine?branch=main#a94243d95ef6fcbec6224930951fd47558466fd1"
+source = "git+https://github.com/xenomit-do/xenomit-behavior-engine?tag=v0.1.0#17acd436f48eb4fbffee44b0f8444e5be6c186dd"
 dependencies = [
  "serde",
  "serde_json",
@@ -2151,7 +2151,7 @@ dependencies = [
 [[package]]
 name = "xenomit-game-api"
 version = "0.1.0"
-source = "git+https://github.com/xenomit-do/xenomit-game-api?branch=main#60c27a5c48fbae0817c2dc8d205fdffda61ea60d"
+source = "git+https://github.com/xenomit-do/xenomit-game-api?tag=v0.1.0#60c27a5c48fbae0817c2dc8d205fdffda61ea60d"
 dependencies = [
  "roxmltree",
  "serde",
@@ -2163,7 +2163,7 @@ dependencies = [
 [[package]]
 name = "xenomit-packet-client"
 version = "0.1.0"
-source = "git+https://github.com/xenomit-do/xenomit-packet-client?branch=main#30f170e93e65aa25579abd6a4b66f704a6b30f16"
+source = "git+https://github.com/xenomit-do/xenomit-packet-client?tag=v0.1.0#9be2dd2ce1229aebfc0fae5bb193de0c55430939"
 dependencies = [
  "base64 0.22.1",
  "serde_json",
@@ -2175,7 +2175,7 @@ dependencies = [
 [[package]]
 name = "xenomit_backpage"
 version = "0.1.0"
-source = "git+https://github.com/xenomit-do/xenomit-backpage?branch=main#a7d1588f397cd41fd945cf90fa2c2c08f902ec2b"
+source = "git+https://github.com/xenomit-do/xenomit-backpage?tag=v0.1.0#a7d1588f397cd41fd945cf90fa2c2c08f902ec2b"
 dependencies = [
  "base64 0.22.1",
  "flate2",
