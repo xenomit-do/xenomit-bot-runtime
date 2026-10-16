@@ -8,10 +8,10 @@ description = "GUI-free Xenomit bot runtime: behavior worker, statistics journal
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1.53.1", features = ["rt", "time"] }
-xenomit_backpage = { path = "../xenomit-backpage" }
-xenomit-behavior-engine = { path = "../xenomit-behavior-engine" }
-xenomit-game-api = { path = "../xenomit-game-api" }
-xenomit-packet-client = { path = "../xenomit-packet-client", features = ["game-api"] }
+xenomit_backpage = { git = "https://github.com/xenomit-do/xenomit-backpage", branch = "main" }
+xenomit-behavior-engine = { git = "https://github.com/xenomit-do/xenomit-behavior-engine", branch = "main" }
+xenomit-game-api = { git = "https://github.com/xenomit-do/xenomit-game-api", branch = "main" }
+xenomit-packet-client = { git = "https://github.com/xenomit-do/xenomit-packet-client", branch = "main", features = ["game-api"] }
 roxmltree = "0.20"
 flate2 = "1"
 regex = "1"
