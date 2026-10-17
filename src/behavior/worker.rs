@@ -91,6 +91,12 @@ pub(super) fn run_loop(
     }
     let mut drain: Option<DrainState> = None;
     let mut last_drain_reason: Option<String> = None;
+    let mut last_feature_poll: Option<Instant> = None;
+    let mut latest_features: Option<xenomit_game_api::ClientFeatureState> = None;
+    let mut last_event_poll: Option<Instant> = None;
+    let mut event_cursor = 0_u64;
+    let mut last_log_error: Option<String> = None;
+    let mut revive_refresh_pending = false;
     while !stop.is_cancelled() {
         rule_operations.retain(|handle| match operations.poll(*handle) {
             OperationPoll::Pending => true,
@@ -124,28 +130,97 @@ pub(super) fn run_loop(
                     module_settings = module.settings.clone();
                     behavior_settings = incoming;
                     settings_error = None;
-                    if let Some(ms) = module.settings.get("tick_ms").and_then(Value::as_u64) {
-                        tick = Duration::from_millis(ms.clamp(10, 60_000));
-                    }
+                    tick = effective_tick(&module.settings, TICK);
                 }
                 Err(error) => settings_error = Some(error),
             }
         }
         let state = client.status().map_err(|error| error.to_string());
         let ready = state.as_ref().is_ok_and(|status| status.ready);
+        let now_ms = started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
+        if ready
+            && last_feature_poll.is_none_or(|at| at.elapsed() >= Duration::from_secs(1))
+        {
+            latest_features = client.feature_state().ok();
+            last_feature_poll = Some(Instant::now());
+        }
+        if ready && last_event_poll.is_none_or(|at| at.elapsed() >= Duration::from_secs(1)) {
+            last_event_poll = Some(Instant::now());
+            if let Ok(batch) = client.poll_events(event_cursor) {
+                if batch.dropped {
+                    publish(&report, "Some client log events expired before the runtime read them");
+                }
+                let tree = module_settings.get("config_tree");
+                let log_chat = tree
+                    .and_then(|root| root.pointer("/miscellaneous/log_chat"))
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                let log_deaths = tree
+                    .and_then(|root| root.pointer("/miscellaneous/log_deaths"))
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                for event in &batch.events {
+                    let kind = event.kind.to_ascii_lowercase();
+                    let destination = if log_chat && matches!(kind.as_str(), "chat" | "chat_message") {
+                        Some("chat.jsonl")
+                    } else if log_deaths
+                        && matches!(kind.as_str(), "death" | "ship_destroyed" | "player_death")
+                    {
+                        Some("deaths.jsonl")
+                    } else {
+                        None
+                    };
+                    if let Some(file) = destination
+                        && let Err(error) = append_client_event(file, event)
+                    {
+                        let message = format!("Could not write {file}: {error}");
+                        if last_log_error.as_deref() != Some(message.as_str()) {
+                            publish(&report, message.clone());
+                            last_log_error = Some(message);
+                        }
+                    }
+                }
+                event_cursor = batch.next_sequence;
+            }
+        }
         let snapshot = if ready {
             client
                 .snapshot(None)
                 .map(|mut snapshot| {
                     normalize_world_positions(&mut snapshot);
                     apply_global_target_constraints(&mut snapshot, &module_settings);
+                    snapshot.navigation.features = latest_features.clone();
+                    if let Some(group) = latest_features
+                        .as_ref()
+                        .and_then(|features| features.group.clone())
+                    {
+                        snapshot.navigation.group = group;
+                    }
                     snapshot
                 })
                 .ok()
         } else {
             None
         };
-        let now_ms = started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
+        let refresh_after_revive = module_settings
+            .get("config_tree")
+            .and_then(|tree| tree.pointer("/miscellaneous/refresh_after_revive"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let hero_dead = snapshot.as_ref().is_some_and(|snapshot| {
+            snapshot.navigation.hero.killed
+                || snapshot.entities.iter().any(|entity| {
+                    entity.category == xenomit_game_api::EntityCategory::Player
+                        && entity.health.is_some_and(|health| health <= 0.0)
+                })
+        });
+        if refresh_after_revive && hero_dead {
+            revive_refresh_pending = true;
+        }
+        let revived = refresh_after_revive && revive_refresh_pending && !hero_dead;
+        if revived {
+            revive_refresh_pending = false;
+        }
         let rule_output = behaviors
             .lock()
             .map_err(|_| "Behavior lock was poisoned")?
@@ -156,9 +231,10 @@ pub(super) fn run_loop(
                 stopped: snapshot.as_ref().is_none_or(|s| s.navigation.hero.killed),
             });
         let owns_plan = rule_output.takeover.is_some();
-        let refresh_requested = rule_output
+        let refresh_requested = (rule_output
             .host_actions
             .contains(&HostAction::RequestRefresh)
+            || revived)
             && !rule_output.stop;
         let mut refresh_deferred = None;
         if refresh_requested {
@@ -510,6 +586,24 @@ pub(super) fn run_loop(
     executor.stop(&*client)
 }
 
+fn append_client_event(
+    file_name: &str,
+    event: &xenomit_game_api::ClientEvent,
+) -> Result<(), String> {
+    use std::io::Write;
+
+    let directory = crate::settings::config_root().join("logs");
+    std::fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+    let path = directory.join(file_name);
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .map_err(|error| error.to_string())?;
+    serde_json::to_writer(&mut file, event).map_err(|error| error.to_string())?;
+    file.write_all(b"\n").map_err(|error| error.to_string())
+}
+
 #[cfg(test)]
 pub(super) fn step_behavior(
     client: &dyn GameClient,
@@ -569,6 +663,20 @@ pub(super) fn execute_decision(
         ActionIntent::CollectBox { target, wait_ms } => Some((target, *wait_ms)),
         _ => None,
     });
+    let roaming = settings.pointer("/config_tree/general/roaming");
+    let keep_roam_target = roaming
+        .and_then(|value| value.get("keep"))
+        .and_then(Value::as_bool)
+        .unwrap_or(true);
+    let sequential_roaming = roaming
+        .and_then(|value| value.get("sequential"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    if !keep_roam_target
+        && (decision.selected_npc.is_some() || move_to.is_some() || collect.is_some())
+    {
+        executor.roam_target = None;
+    }
     if collect.is_none()
         && !decision
             .actions
@@ -641,7 +749,7 @@ pub(super) fn execute_decision(
         // The plan is empty — no NPC or box is in range. Keep searching the
         // map instead of sitting inert, so modules hunt their targets down.
         let zone_targets = zone_roam_targets(snapshot, settings);
-        if executor.roam(client, player.position, snapshot, settings, &zone_targets)? {
+        if executor.roam(client, player.position, snapshot, settings, &zone_targets, sequential_roaming)? {
             Ok(match decision.note.clone() {
                 Some(note) => format!("{note}; roaming the map"),
                 None => "Roaming the map".into(),

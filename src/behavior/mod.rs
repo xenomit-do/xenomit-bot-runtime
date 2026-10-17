@@ -11,7 +11,7 @@ use crate::handoff::{
 };
 use xenomit_behavior_engine::{
     ActionIntent, BehaviorDecision, BehaviorRegistry, BehaviorRunner, CancellationToken,
-    CoordinateTransform, HostAction, InterruptionContext, InterruptionReason, InterruptionStatus,
+    AvoidanceConfig, CoordinateTransform, HostAction, InterruptionContext, InterruptionReason, InterruptionStatus,
     ModuleRegistry, ModuleRunner, MovementRouter, ObstacleNavigation, OperationHost, OperationPoll,
     PluginCatalog, PluginSelection, RuleContext, RunState, ServiceRegistry, ServiceRegistryBuilder,
     SkylabAction, ThreadedOperationHost, builtin_behavior_registry, filter_booty_boxes,
@@ -48,6 +48,22 @@ use worker::*;
 /// number in `ModuleConfig.settings` (the bot uses a slower tick when the
 /// game API runs on the legacy pipe backend, which stalls the player).
 const TICK: Duration = Duration::from_millis(150);
+
+pub(super) fn effective_tick(settings: &serde_json::Value, fallback: Duration) -> Duration {
+    let configured = settings
+        .get("tick_ms")
+        .and_then(serde_json::Value::as_u64)
+        .map(|ms| ms.clamp(10, 60_000))
+        .unwrap_or(fallback.as_millis().clamp(10, 60_000) as u64);
+    let floor = settings
+        .get("config_tree")
+        .and_then(|tree| tree.get("bot_settings"))
+        .and_then(|root| root.get("performance"))
+        .and_then(|performance| performance.get("min_tick"))
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or(0);
+    Duration::from_millis(configured.max(floor).clamp(10, 60_000))
+}
 
 const MOVE_REFRESH: Duration = Duration::from_millis(1_500);
 

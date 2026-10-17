@@ -99,6 +99,11 @@ impl FlashBackend {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct BotSettings {
+    /// Resolved settings-tree values for the active config profile. Defaults
+    /// are included so runtime consumers can evolve without breaking older
+    /// `modules.json` files.
+    #[serde(default)]
+    pub config_tree: serde_json::Value,
     /// Independent settings payloads for every discovered/custom module.
     pub modules: BTreeMap<String, serde_json::Value>,
     /// Global behavior rules that apply alongside the selected objective.
@@ -117,6 +122,10 @@ pub struct BotSettings {
     #[serde(default)]
     pub player_tags: BTreeMap<i32, String>,
     pub client: ClientKind,
+    /// Restorable main-window position and size in desktop pixels, populated
+    /// by the GUI only when `bot_gui.save_gui_pos` is enabled.
+    #[serde(default)]
+    pub gui_window_bounds: Option<[i32; 4]>,
     pub active_module: String,
     pub preferred_zone: String,
     pub working_map: String,
@@ -165,6 +174,7 @@ pub struct BotSettings {
 impl Default for BotSettings {
     fn default() -> Self {
         Self {
+            config_tree: json!({}),
             modules: BTreeMap::new(),
             behaviors: json!({}),
             plugins: BTreeMap::new(),
@@ -172,6 +182,7 @@ impl Default for BotSettings {
             active_behavior_profile: String::new(),
             player_tags: BTreeMap::new(),
             client: ClientKind::Ruffle,
+            gui_window_bounds: None,
             active_module: "kill_collect".into(),
             preferred_zone: "1-8".into(),
             working_map: "1-8".into(),
@@ -243,6 +254,7 @@ impl BotSettings {
                     "instant_repair_above": self.instant_repair_above,
                 },
                 "features": self.feature_flags,
+                "player_tags": self.player_tags,
                 "npcs": self.npcs,
                 "plugins": self.plugins,
                 "tick_ms": match (self.client, self.game_api_backend) {
@@ -251,6 +263,7 @@ impl BotSettings {
                     (_, ClientBackend::LegacyPipe) => 750,
                 },
                 "behavior_config": self.behavior_config,
+                "config_tree": self.config_tree,
             }),
         };
         if let Some(settings) = self.modules.get(id) {

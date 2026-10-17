@@ -138,6 +138,7 @@ pub struct Statistics {
     next_seq: u64,
     /// True once an event was dropped from the full outbox.
     pub outbox_dropped: bool,
+    updates_enabled: bool,
     user_id: i64,
     sinks: Vec<Arc<dyn StatSink>>,
 }
@@ -187,6 +188,7 @@ impl Statistics {
             cursor,
             next_seq: cursor,
             outbox_dropped: false,
+            updates_enabled: true,
             user_id: session.user_id,
             sinks,
         };
@@ -232,6 +234,12 @@ impl Statistics {
     /// outbox, a test recorder, …).
     pub fn add_sink(&mut self, sink: Arc<dyn StatSink>) {
         self.sinks.push(sink);
+    }
+
+    /// Control whether live events and balance reconciliations are appended.
+    /// Existing history remains readable while updates are paused.
+    pub fn set_updates_enabled(&mut self, enabled: bool) {
+        self.updates_enabled = enabled;
     }
 
     fn append(&mut self, mut event: Event) {
@@ -323,11 +331,17 @@ impl Statistics {
     }
 
     pub fn log(&mut self, message: &str, source: &str, at: u64) {
+        if !self.updates_enabled {
+            return;
+        }
         let rewards = parse_rewards(message);
         self.log_with_rewards(message, source, at, rewards);
     }
 
     fn log_with_rewards(&mut self, message: &str, source: &str, at: u64, rewards: [f64; 4]) {
+        if !self.updates_enabled {
+            return;
+        }
         for (index, value) in rewards.iter().enumerate() {
             if let Some(balance) = &mut self.balances[index] {
                 *balance += value;
@@ -348,6 +362,9 @@ impl Statistics {
     }
 
     pub fn reconcile(&mut self, balances: [Option<f64>; 4], source: &str, at: u64) {
+        if !self.updates_enabled {
+            return;
+        }
         let mut updated = false;
         for (index, value) in balances.into_iter().enumerate() {
             if let Some(value) = value.filter(|v| v.is_finite()) {
@@ -369,6 +386,9 @@ impl Statistics {
     }
 
     pub fn client_line(&mut self, line: &str) {
+        if !self.updates_enabled {
+            return;
+        }
         let (prefix, reward) = if line.starts_with("[game-log] ") {
             ("[game-log] ", true)
         } else if line.starts_with("[game-assets] ") {

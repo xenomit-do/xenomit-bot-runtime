@@ -180,6 +180,7 @@ fn executor_routes_movement_around_obstacles() {
         id: -1,
         name: "NOA".into(),
         inverted: false,
+        kind: xenomit_game_api::ObstacleKind::NoAccess,
         shape: xenomit_game_api::ObstacleShape::Rectangle {
             bounds: Bounds {
                 x: 700.0,
@@ -418,9 +419,18 @@ fn roam_advances_to_the_next_waypoint_on_arrival() {
         6_550.0,
         1,
     )]));
-    let (mut planner, mut executor) = npc_killer(&client);
+    let mut module = module("npc_killer");
+    module.settings = json!({
+        "config_tree": {"general": {"roaming": {"sequential": true}}}
+    });
+    let settings = module.settings.clone();
+    let mut planner = BehaviorEngine::new(configured_behavior(&module).unwrap()).unwrap();
+    let mut executor = ActionExecutor::default();
 
-    step_behavior(&client, &mut planner, &mut executor).unwrap();
+    let mut snapshot = client.snapshot(None).unwrap();
+    normalize_world_positions(&mut snapshot);
+    let decision = planner.step(&snapshot, snapshot.observed_at_unix_ms);
+    execute_decision(&client, &snapshot, &decision, &mut executor, &settings).unwrap();
     let moves = client.calls("moveHeroToCordinates");
     assert_eq!(moves.len(), 1);
     // The player is at the map center (first patrol point), so the ship
