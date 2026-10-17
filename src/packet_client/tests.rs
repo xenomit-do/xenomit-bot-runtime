@@ -100,6 +100,9 @@ fn fixture() -> (ControllerPacketClient, TcpStream) {
             y: 210,
             type_id: 1,
             type_str: String::new(),
+            pulse_color_id: 0,
+            colour_code: 0,
+            event_modifier: String::new(),
         },
     );
     (

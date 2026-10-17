@@ -297,7 +297,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1073,7 +1073,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1290,7 +1290,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1632,7 +1632,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2122,7 +2122,7 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 [[package]]
 name = "xenomit-behavior-engine"
 version = "0.1.0"
-source = "git+https://github.com/xenomit-do/xenomit-behavior-engine?tag=v0.1.0#17acd436f48eb4fbffee44b0f8444e5be6c186dd"
+source = "git+https://github.com/xenomit-do/xenomit-behavior-engine?rev=e36fb738e1c779abb2e15b2007d98c580a33063b#e36fb738e1c779abb2e15b2007d98c580a33063b"
 dependencies = [
  "serde",
  "serde_json",
@@ -2151,7 +2151,7 @@ dependencies = [
 [[package]]
 name = "xenomit-game-api"
 version = "0.1.0"
-source = "git+https://github.com/xenomit-do/xenomit-game-api?tag=v0.1.0#60c27a5c48fbae0817c2dc8d205fdffda61ea60d"
+source = "git+https://github.com/xenomit-do/xenomit-game-api?rev=6fe255e#6fe255efe03bcebea819a0d77af6e99860ebd8d7"
 dependencies = [
  "roxmltree",
  "serde",
@@ -2163,7 +2163,7 @@ dependencies = [
 [[package]]
 name = "xenomit-packet-client"
 version = "0.1.0"
-source = "git+https://github.com/xenomit-do/xenomit-packet-client?tag=v0.1.0#9be2dd2ce1229aebfc0fae5bb193de0c55430939"
+source = "git+https://github.com/xenomit-do/xenomit-packet-client?rev=379a67e766b7625e5fba42bcd7873f5c34875237#379a67e766b7625e5fba42bcd7873f5c34875237"
 dependencies = [
  "base64 0.22.1",
  "serde_json",

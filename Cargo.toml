@@ -9,9 +9,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1.53.1", features = ["rt", "time"] }
 xenomit_backpage = { git = "https://github.com/xenomit-do/xenomit-backpage", tag = "v0.1.0" }
-xenomit-behavior-engine = { git = "https://github.com/xenomit-do/xenomit-behavior-engine", tag = "v0.1.0" }
-xenomit-game-api = { git = "https://github.com/xenomit-do/xenomit-game-api", tag = "v0.1.0" }
-xenomit-packet-client = { git = "https://github.com/xenomit-do/xenomit-packet-client", tag = "v0.1.0", features = ["game-api"] }
+xenomit-behavior-engine = { git = "https://github.com/xenomit-do/xenomit-behavior-engine", rev = "e36fb738e1c779abb2e15b2007d98c580a33063b" }
+xenomit-game-api = { git = "https://github.com/xenomit-do/xenomit-game-api", rev = "6fe255e" }
+xenomit-packet-client = { git = "https://github.com/xenomit-do/xenomit-packet-client", rev = "379a67e766b7625e5fba42bcd7873f5c34875237", features = ["game-api"] }
 roxmltree = "0.20"
 flate2 = "1"
 regex = "1"

@@ -12,6 +12,7 @@ pub(super) struct ActionExecutor {
     pub(super) collecting_until: Option<Instant>,
     pub(super) roam_index: usize,
     pub(super) roam_target: Option<(f64, f64)>,
+    pub(super) roam_random_state: u64,
 }
 
 /// Stop previously issued actions even when a custom tick unwinds. Keep this
@@ -39,7 +40,25 @@ impl ActionExecutor {
         destination: xenomit_behavior_engine::Point,
     ) -> Result<(), String> {
         let destination = clip_destination_away_from_zones(snapshot, settings, from, destination);
-        match self.router.next(snapshot, from, destination, self.now_ms)? {
+        let misc = settings.pointer("/config_tree/miscellaneous");
+        let avoidance = AvoidanceConfig {
+            mines: misc
+                .and_then(|value| value.get("avoid_mines"))
+                .and_then(Value::as_bool)
+                .unwrap_or(true),
+            cbs: misc
+                .and_then(|value| value.get("avoid_cbs"))
+                .and_then(Value::as_bool)
+                .unwrap_or(true),
+            radiation: misc
+                .and_then(|value| value.get("avoid_radiation"))
+                .and_then(Value::as_bool)
+                .unwrap_or(true),
+        };
+        match self
+            .router
+            .next_avoiding(snapshot, from, destination, self.now_ms, &avoidance)?
+        {
             Some(next) => self.move_to(client, next),
             None => {
                 self.collecting_until = None;
@@ -172,6 +191,7 @@ impl ActionExecutor {
         snapshot: &GameSnapshot,
         settings: &Value,
         zone_targets: &[xenomit_behavior_engine::Point],
+        sequential: bool,
     ) -> Result<bool, String> {
         if self
             .collecting_until
@@ -197,8 +217,8 @@ impl ActionExecutor {
         {
             if !zone_targets.is_empty() {
                 for _ in 0..zone_targets.len() {
-                    let target = zone_targets[self.roam_index % zone_targets.len()];
-                    self.roam_index = (self.roam_index + 1) % zone_targets.len();
+                    let index = self.next_roam_index(zone_targets.len(), sequential);
+                    let target = zone_targets[index];
                     self.roam_target = Some((target.x, target.y));
                     if (player.x - target.x).hypot(player.y - target.y) >= ROAM_ARRIVAL {
                         break;
@@ -206,8 +226,8 @@ impl ActionExecutor {
                 }
             } else {
                 for _ in 0..ROAM_FRACTIONS.len() {
-                    let (fx, fy) = ROAM_FRACTIONS[self.roam_index % ROAM_FRACTIONS.len()];
-                    self.roam_index = (self.roam_index + 1) % ROAM_FRACTIONS.len();
+                    let index = self.next_roam_index(ROAM_FRACTIONS.len(), sequential);
+                    let (fx, fy) = ROAM_FRACTIONS[index];
                     let destination = (width * fx, height * fy);
                     self.roam_target = Some(destination);
                     if (player.x - destination.0).hypot(player.y - destination.1) >= ROAM_ARRIVAL {
@@ -230,6 +250,35 @@ impl ActionExecutor {
             return Err(error);
         }
         Ok(true)
+    }
+
+    fn next_roam_index(&mut self, count: usize, sequential: bool) -> usize {
+        if count <= 1 {
+            self.roam_index = 0;
+            return 0;
+        }
+        if sequential {
+            let index = self.roam_index % count;
+            self.roam_index = (index + 1) % count;
+            return index;
+        }
+        if self.roam_random_state == 0 {
+            self.roam_random_state = self.now_ms
+                ^ (self.roam_index as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15)
+                ^ u64::from(self.now_ms as u32).rotate_left(17)
+                ^ 0xa076_1d64_78bd_642f;
+        }
+        let mut state = self.roam_random_state;
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        self.roam_random_state = state;
+        let mut index = (state as usize) % count;
+        if index == self.roam_index % count {
+            index = (index + 1) % count;
+        }
+        self.roam_index = (index + 1) % count;
+        index
     }
 
     pub(super) fn stop_moving(&mut self, client: &dyn GameClient) -> Result<(), String> {

@@ -122,6 +122,39 @@ impl BehaviorRuntime for PlannerRuntime {
         };
         let behaviors = Arc::new(Mutex::new(rule_registry.create(&behavior_settings)?));
         let rules_started = Instant::now();
+        let reset_refresh = module
+            .settings
+            .get("config_tree")
+            .and_then(|tree| tree.pointer("/miscellaneous/reset_refresh"))
+            .and_then(Value::as_bool)
+            .unwrap_or(true);
+        if !reset_refresh {
+            let previous_state = {
+                let session = self
+                    .behavior_session
+                    .lock()
+                    .map_err(|_| "Behavior session lock was poisoned")?;
+                session.as_ref().and_then(|session| {
+                    (session.selection == selection).then(|| {
+                        let now_ms = session
+                            .started
+                            .elapsed()
+                            .as_millis()
+                            .min(u128::from(u64::MAX)) as u64;
+                        session
+                            .runner
+                            .lock()
+                            .ok()
+                            .map(|runner| runner.export_state(now_ms))
+                    })
+                }).flatten()
+            };
+            if let Some(state) = previous_state {
+                if let Ok(mut runner) = behaviors.lock() {
+                    let _ = runner.restore_state(&state, 0);
+                }
+            }
+        }
         for (rule, service) in [
             ("urgent_detector", "game.urgent_quest"),
             ("calendar_bonus", "backpage.calendar"),
@@ -144,12 +177,7 @@ impl BehaviorRuntime for PlannerRuntime {
                 ));
             }
         }
-        let tick = module
-            .settings
-            .get("tick_ms")
-            .and_then(Value::as_u64)
-            .map(|ms| Duration::from_millis(ms.clamp(10, 60_000)))
-            .unwrap_or(TICK);
+        let tick = effective_tick(&module.settings, TICK);
         let mut slot = self
             .worker
             .lock()
